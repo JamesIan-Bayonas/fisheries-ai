@@ -5,43 +5,75 @@ const express = require('express');
 
 const app = express();
 const bot = new Telegraf(process.env.BOT_TOKEN);
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// 1. The AI Reasoning Function
+// Initialize the new Gemini client properly
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+// 1. The AI Reasoning Function (Updated to actually talk to Gemini)
 async function analyzeCatch(photoUrl) {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    
-    // This is the prompt that enforces the "Contract" we discussed
-    const prompt = "Analyze this fish catch photo. Return ONLY JSON with: {freshness_grade: 'Fresh'|'Fermentation', primary_species: string, contains_bycatch: boolean}.";
-    
-    // Logic to send the image URL to Gemini goes here
-    // For now, let's log the attempt
-    console.log("🧠 Sending photo to AI for analysis...");
-    return { freshness_grade: "Fresh", primary_species: "Small Shrimp", contains_bycatch: true }; 
+    console.log("🧠 Fetching image and sending to AI...");
+
+    // Fetch the image from Telegram's servers
+    const response = await fetch(photoUrl);
+    const buffer = await response.arrayBuffer();
+
+    const promptText = "Analyze this fish catch photo. Return ONLY JSON with: {\"freshness_grade\": \"Fresh\"|\"Fermentation\", \"primary_species\": \"string\", \"contains_bycatch\": true|false}. Do not include markdown formatting or backticks.";
+
+    // Use the NEW SDK syntax to send the image and prompt
+    const result = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [
+            promptText,
+            {
+                inlineData: {
+                    data: Buffer.from(buffer).toString("base64"),
+                    mimeType: "image/jpeg",
+                },
+            },
+        ],
+    });
+
+    // Parse the AI's text response back into a JSON object
+    const text = result.text;
+    console.log("✅ AI Response received:", text);
+    return JSON.parse(text.replace(/```json|```/g, "").trim());
 }
 
-// 2. The Telegram Listener (The Ear)
+// 2. The Telegram Listener
+// 2. The Telegram Listener (DEBUG MODE)
 bot.on('photo', async (ctx) => {
-    const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
-    const fileUrl = await ctx.telegram.getFileLink(fileId);
+    try {
+        const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+        const fileUrl = await ctx.telegram.getFileLink(fileId);
 
-    ctx.reply("🕒 Analyzing your catch... please wait.");
+        console.log("👀 New photo detected!");
+        await ctx.reply("🕒 Analyzing your catch... please wait.");
 
-    // Trigger the AI Brain
-    const result = await analyzeCatch(fileUrl);
+        const result = await analyzeCatch(fileUrl);
 
-    // 3. The Routing Logic (The Action)
-    if (result.freshness_grade === "Fresh") {
-        ctx.reply(`✅ GRADE A: ${result.primary_species} detected. Sending to Fresh Market Buyers...`);
-    } else {
-        ctx.reply(`⚠️ GRADE B: Found ${result.primary_species}. Routing to Fermentation/Bagoong Processors.`);
+        if (result.freshness_grade === "Fresh") {
+            await ctx.reply(`✅ GRADE A: ${result.primary_species} detected. Sending to Fresh Market...`);
+        } else {
+            await ctx.reply(`⚠️ GRADE B: Found ${result.primary_species}. Routing to Processors.`);
+        }
+    } catch (error) {
+        // Force the terminal to print a massive error
+        console.error("🔥 CRITICAL ERROR 🔥\n", error);
+        
+        // THE MAGIC TRICK: Send the error straight to the fisherman's phone!
+        await ctx.reply(`🛠️ DEV DEBUG MODE:\nI crashed! The reason is: ${error.message}`);
     }
 });
 
-// 4. Start the Server
+// 3. The Webhook Middleware (The "Doorbell")
+// This MUST match the path you used in your browser handshake
 app.use(bot.webhookCallback('/secret-path'));
-app.listen(process.env.PORT, () => {
-    console.log(`🚀 Fishery Orchestrator live on port ${process.env.PORT}`);
+
+// 4. Start the Express Server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`🚀 Isdalog Connect is live on port ${PORT}`);
+    console.log(`🔗 Listening for data from: https://omnivorously-unobjectified-herlinda.ngrok-free.dev/secret-path`);
 });
 
-bot.launch();
+// DO NOT USE bot.launch() here. Express handles the "launching" now.
