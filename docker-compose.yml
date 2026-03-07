@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # 1. The IsdaLog Web Server (Nginx)
+  webserver:
+    image: nginx:alpine
+    container_name: isdalog-webserver
+    ports:
+      - "8000:80"
+    volumes:
+      - ./:/var/www
+      - ./nginx/conf.d/:/etc/nginx/conf.d/
+    networks:
+      - isdalog-network
+
+  # 2. The IsdaLog App (PHP/Laravel)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: isdalog-app
+    volumes:
+      - ./:/var/www
+    networks:
+      - isdalog-network
+
+  # 3. The Database (MySQL)
+  db:
+    image: mysql:8.0
+    container_name: isdalog-db
+    environment:
+      MYSQL_DATABASE: isdalog_db
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - dbdata:/var/lib/mysql
+    networks:
+      - isdalog-network
+
+  # 4. NEW: The Fishery-AI Bot
+  fishery-ai:
+    build:
+      context: ./fishery-ai  # Path to your Fishery-AI folder
+      dockerfile: Dockerfile
+    container_name: fishery-ai-bot
+    restart: unless-stopped
+    env_file:
+      - ./fishery-ai/.env
+    depends_on:
+      - webserver # Wait for IsdaLog to be ready before starting the bot
+    networks:
+      - isdalog-network
+
+networks:
+  isdalog-network:
+    driver: bridge
+
+volumes:
+  dbdata:
