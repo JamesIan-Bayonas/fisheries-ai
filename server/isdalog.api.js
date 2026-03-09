@@ -1,4 +1,3 @@
-// services/isdalog.api.js
 const axios = require('axios');
 
 class IsdaLogAPI {
@@ -14,20 +13,30 @@ class IsdaLogAPI {
   }
 
   /**
-   * Sends the AI-analyzed catch data to the Laravel database
+   * Logs catch data into the IsdaLog system.
+   * @param {Object} aiData { species, weight }
    */
-  async logCatch(catchData) {
+  async logCatch(aiData) {
     try {
-      const response = await this.client.post('/catches', {
-        species: catchData.species,
-        weight: catchData.weight,
-        location: catchData.location || 'Unknown',
-        timestamp: new Date().toISOString()
-      });
+      // 1. Sanitize the data to match the strict JSON contract
+      // This strips out text like "kg" or "kilos" leaving only the float number
+      let cleanWeight = typeof aiData.weight === 'string' 
+          ? parseFloat(aiData.weight.replace(/[^0-9.]/g, ''))
+          : aiData.weight;
+
+      // 2. Build the exact payload Laravel expects
+      const payload = {
+        species: aiData.species || 'Unknown',
+        weight: cleanWeight || 0,
+        location: 'Dipolog City Port' // Defaulting to local maritime context
+      };
+
+      // 3. Send the payload across the internal Docker network to Laravel
+      const response = await this.client.post('/catches', payload);
       return response.data;
     } catch (error) {
-      console.error('Failed to log catch to IsdaLog:', error.message);
-      throw error;
+      console.error('Handshake Failed:', error.response?.data || error.message);
+      throw new Error('Failed to synchronize with IsdaLog database.');
     }
   }
 }
