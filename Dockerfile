@@ -9,7 +9,7 @@ COPY package*.json ./
 # install build dependencies, run install, then remove build deps to keep image small
 RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 make g++ \
-  && npm ci --production --unsafe-perm --no-audit --prefer-offline \
+  && npm install --production --unsafe-perm --no-audit --prefer-offline \
   && apt-get remove -y python3 make g++ \
   && apt-get autoremove -y \
   && rm -rf /var/lib/apt/lists/* /root/.npm

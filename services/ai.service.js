@@ -2,10 +2,10 @@ const axios = require('axios');
 
 class AIService {
   constructor() {
-    // We use host.docker.internal to escape the Docker container 
-    // and talk directly to your Lenovo's Windows localhost
+    // host.docker.internal allows the Docker container to escape its isolated network 
+    // and talk directly to your Windows machine's localhost (where Ollama lives)
     this.ollamaUrl = 'http://host.docker.internal:11434/api/generate';
-    this.modelName = 'llava'; // The local vision model we downloaded
+    this.modelName = 'llava'; 
   }
 
   async analyzeCatchImage(imageBuffer) {
@@ -13,32 +13,33 @@ class AIService {
       console.log(`[Edge-AI] Sending image to local RTX 4060 (${this.modelName})...`);
 
       const prompt = `
-        Analyze this fish catch image. 
-        Identify the exact species and estimate the weight in kilograms. 
+        Analyze this maritime fish catch image. 
+        Identify the exact species and estimate the average adult weight in kilograms. 
         Respond ONLY with a valid JSON object in this exact format:
         {"species": "Fish Name", "weight": 0.0}
       `;
 
-      // The payload for our local Ollama engine
+      // The payload structure specifically required by Ollama
       const payload = {
         model: this.modelName,
         prompt: prompt,
         images: [imageBuffer.toString('base64')],
         stream: false,
-        format: 'json' // Ollama feature: Forces the AI to output perfect JSON!
+        format: 'json' // Forces Ollama to output strict JSON
       };
 
       const response = await axios.post(this.ollamaUrl, payload);
       
-      // Ollama returns the generated text inside the 'response' property
       const rawText = response.data.response;
       
-      // Parse and return the data
-      return JSON.parse(rawText);
+      // Sanitize any markdown backticks the AI might accidentally include
+      const cleanJson = rawText.replace(/```json|```/g, "").trim();
+      
+      return JSON.parse(cleanJson);
 
     } catch (error) {
       console.error("[Edge-AI] Local Analysis Failed:", error.message);
-      // Fallback object to prevent crashing the ecosystem
+      // Failsafe to prevent the bot from entering a crash loop
       return { species: "Unknown (Local AI Error)", weight: 0.0 };
     }
   }
