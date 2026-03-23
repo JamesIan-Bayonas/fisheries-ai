@@ -76,7 +76,7 @@ bot.on('location', async (ctx) => {
     }
 });
 
-bot.launch().then(() => {
+bot.launch({ dropPendingUpdates: true }).then(() => {
     console.log('[Bot] Telegram connection established. Geospatial Module active.');
 });
 
