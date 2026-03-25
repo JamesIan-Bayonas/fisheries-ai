@@ -15,6 +15,8 @@ bot.start(async (ctx) => {
         await isdalogApi.handshake(ctx.from.id, ctx.from.first_name);
         await ctx.reply(`✅ Welcome aboard, ${ctx.from.first_name}! Send me a photo of your catch to begin.`);
     } catch (error) {
+        // Log the actual technical error to the Docker console
+        console.error("Handshake Error Details:", error.message || error);
         await ctx.reply("⚠️ Error connecting to the maritime database. Please try again.");
     }
 });
