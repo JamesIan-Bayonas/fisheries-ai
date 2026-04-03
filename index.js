@@ -140,12 +140,26 @@ bot.on('photo', async (ctx) => {
 });
 
 bot.on('location', async (ctx) => {
-    
     const lang = ctx.session.lang;
     try {
+        // 1. Retrieve the AI data we saved in the session during the photo step
+        const aiData = ctx.session.pendingCatch;
+        
+        if (!aiData) {
+            return ctx.reply(locales[lang].needPhoto); // Failsafe
+        }
+
+        // 2. Extract Latitude and Longitude from Telegram's location object
+        const lat = ctx.message.location.latitude;
+        const lon = ctx.message.location.longitude;
+
+        // 3. Now send it to Laravel
         const dbResponse = await isdalogApi.logCatch(aiData, ctx.from.id, lat, lon);
+        
+        // 4. Clear the session so they can scan a new fish
         ctx.session.pendingCatch = null;
         
+        // 5. Construct the final message using the data we just pulled
         let finalMessage = `${locales[lang].success}\n\n🐟 Species: ${aiData.species}\n⚖️ Weight: ${aiData.weight} kg`;
         
         // Inject the Laravel Financial Engine Data
@@ -157,6 +171,7 @@ bot.on('location', async (ctx) => {
         if (dbResponse.warning_flag) {
             finalMessage += `\n\n🚨 BFAR WARNING: ${dbResponse.warning_flag}`;
         }
+        
         await ctx.reply(finalMessage, Markup.removeKeyboard());
 
     } catch (error) {
