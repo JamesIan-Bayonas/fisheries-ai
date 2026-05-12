@@ -1,4 +1,5 @@
 require('dotenv').config();
+const { checkSeaConditions } = require('./services/weather.service');
 const TelegramBot = require('node-telegram-bot-api');
 const aiService = require('./services/ai.service');
 const isdalogApi = require('./services/isdalog.api');
@@ -15,7 +16,16 @@ console.log("🎣 IsdaLog Telegram AI Bot is running...");
 bot.on('photo', async (msg) => {
     const chatId = msg.chat.id;
     
-    bot.sendMessage(chatId, "🔍 Scanning catch using Gemini AI...");
+    bot.sendMessage(chatId, "📡 Checking local sea conditions in Dipolog City...");
+    const seaCondition = await checkSeaCondxitions();
+    
+    if (!seaCondition.isSafe) {
+        // If dangerous, send the red alert and STOP the function immediately
+        bot.sendMessage(chatId, seaCondition.message);
+        return; 
+    }
+
+    bot.sendMessage(chatId, "✅ Sea conditions safe. Scanning catch using Gemini AI...");
 
     try {
         const photo = msg.photo[msg.photo.length - 1]; // Get highest resolution
@@ -44,7 +54,7 @@ bot.on('photo', async (msg) => {
     }
 });
 
-// Step 2: Listen for the Weight Input 
+// Step 2: Listen for the Weight Input
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;

@@ -17,7 +17,7 @@ class AIService {
             });
 
             return response.data.response.trim();
-
+            
         } catch (error) {
             console.error("Local AI Inference Error:", error.message);
             return "Unknown Fish";
