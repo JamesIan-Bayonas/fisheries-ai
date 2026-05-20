@@ -17,7 +17,7 @@ bot.on('photo', async (msg) => {
     const chatId = msg.chat.id;
     
     bot.sendMessage(chatId, "📡 Checking local sea conditions in Dipolog City...");
-    const seaCondition = await checkSeaCondxitions();
+    const seaCondition = await checkSeaConditions();
     
     if (!seaCondition.isSafe) {
         // If dangerous, send the red alert and STOP the function immediately
