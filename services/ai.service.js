@@ -4,7 +4,7 @@ class AIService {
     constructor() {
         this.ollamaUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
         this.geminiApiKey = process.env.GEMINI_API_KEY;
-        this.timeoutMs = 5000; // 5-second threshold for maritime network drops
+        this.timeoutMs = 1500; // 5-second threshold for maritime network drops
     }
 
     async identifyFish(imageBuffer) {

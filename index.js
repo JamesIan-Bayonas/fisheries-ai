@@ -36,17 +36,22 @@ bot.on('photo', async (msg) => {
         const arrayBuffer = await response.arrayBuffer();
         const imageBuffer = Buffer.from(arrayBuffer);
 
-        // Pass to Gemini
-        const fishName = await aiService.identifyFish(imageBuffer, 'image/jpeg');
+        // --- FIXED SECTION ---
+        // 1. Capture the full hybrid payload object returned by your service
+        const aiResult = await aiService.identifyFish(imageBuffer, 'image/jpeg');
+        
+        // 2. Extract the string name safely from the .species key
+        const fishNameString = aiResult.species;
 
-        // Initialize session
+        // 3. Initialize session using the extracted string layout mapping keys
         userSessions[chatId] = {
             user_id: 1, // Hardcoded to Fisherman ID 1 for prototype
-            fish_name: fishName,
+            fish_name: fishNameString, // Now guaranteed to be a raw string (e.g., "Tuna")
             location: 'Galas Port',
         };
 
-        bot.sendMessage(chatId, `🎯 Identified: **${fishName}**!\n\nPlease type the total weight in kilograms (e.g., 15):`, { parse_mode: 'Markdown' });
+        // 4. Send the confirmation string down to Telegram
+        bot.sendMessage(chatId, `🎯 Identified: **${fishNameString}**!\n\nPlease type the total weight in kilograms (e.g., 15):`, { parse_mode: 'Markdown' });
 
     } catch (error) {
         console.error(error);
