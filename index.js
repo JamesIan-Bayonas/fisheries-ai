@@ -36,21 +36,19 @@ bot.on('photo', async (msg) => {
         const arrayBuffer = await response.arrayBuffer();
         const imageBuffer = Buffer.from(arrayBuffer);
 
-        // --- FIXED SECTION ---
-        // 1. Capture the full hybrid payload object returned by your service
+        // --- AUTOMATED VISION LAYER ---
         const aiResult = await aiService.identifyFish(imageBuffer, 'image/jpeg');
-        
-        // 2. Extract the string name safely from the .species key
         const fishNameString = aiResult.species;
 
-        // 3. Initialize session using the extracted string layout mapping keys
+        // Initialize session matching both local UI values and Laravel API structures
         userSessions[chatId] = {
-            user_id: 1, // Hardcoded to Fisherman ID 1 for prototype
-            fish_name: fishNameString, // Now guaranteed to be a raw string (e.g., "Tuna")
-            location: 'Galas Port',
+            telegram_chat_id: String(chatId), // Stored as string to find the user in Laravel
+            species: fishNameString,           // Named 'species' to pass validation directly
+            lat: "8.6512",                    // Default geospatial coordinates for Galas Port
+            lon: "123.4211"
         };
 
-        // 4. Send the confirmation string down to Telegram
+        // Send the confirmation down to Telegram
         bot.sendMessage(chatId, `🎯 Identified: **${fishNameString}**!\n\nPlease type the total weight in kilograms (e.g., 15):`, { parse_mode: 'Markdown' });
 
     } catch (error) {
@@ -67,21 +65,22 @@ bot.on('message', async (msg) => {
     if (!text || msg.photo || text.startsWith('/')) return;
 
     const session = userSessions[chatId];
-    if (session && !session.weight_kg) {
+    // Check if session exists and weight hasn't been assigned yet
+    if (session && !session.weight) {
         const weight = parseFloat(text);
 
         if (isNaN(weight)) {
             return bot.sendMessage(chatId, "⚠️ Please enter a valid number (e.g., 15).");
         }
 
-        // Apply dynamic baseline pricing for the UI
-        let basePrice = 1000;
-        if (session.fish_name.includes('Lapu-Lapu')) basePrice = 1500;
-        if (session.fish_name.includes('Tuna')) basePrice = 2500;
-        if (session.fish_name.includes('Bangus')) basePrice = 800;
+        // Apply dynamic baseline pricing calculations purely for the visual summary text
+        let pricePerKg = 150;
+        if (session.species.includes('Lapu-Lapu')) pricePerKg = 250;
+        if (session.species.includes('Tuna') || session.species.includes('Ahi')) pricePerKg = 300;
+        if (session.species.includes('Bangus')) pricePerKg = 120;
 
-        session.weight_kg = weight;
-        session.starting_price = basePrice;
+        session.weight = weight; // Named 'weight' to match Laravel's $request->weight payload
+        const estimatedStartingPrice = pricePerKg * weight;
 
         // Step 3: The Zero-Typing Confirmation Button
         const options = {
@@ -94,7 +93,7 @@ bot.on('message', async (msg) => {
             parse_mode: 'Markdown'
         };
 
-        const summary = `📋 **Catch Summary**\n\n🐟 Species: ${session.fish_name}\n⚖️ Weight: ${session.weight_kg} kg\n📍 Location: ${session.location}\n💰 Est. Starting Bid: ₱${session.starting_price}\n\nIs this correct?`;
+        const summary = `📋 **Catch Summary**\n\n🐟 Species: ${session.species}\n⚖️ Weight: ${session.weight} kg\n📍 Port Context: Galas Port\n💰 Est. Value: ₱${estimatedStartingPrice.toFixed(2)}\n\nIs this correct?`;
         bot.sendMessage(chatId, summary, options);
     }
 });
@@ -114,11 +113,14 @@ bot.on('callback_query', async (callbackQuery) => {
         bot.editMessageText("🚀 Publishing to IsdaLog Trading Floor...", { chat_id: chatId, message_id: msg.message_id });
 
         try {
+            // Sends the compiled session object ({telegram_chat_id, species, weight, lat, lon}) to Laravel
             await isdalogApi.publishCatch(session);
-            bot.editMessageText("✅ **Successfully Published!**\nMerchants are now viewing your catch.", { chat_id: chatId, message_id: msg.message_id, parse_mode: 'Markdown' });
+            
+            bot.editMessageText("✅ **Successfully Published!**\nMerchants are now viewing your catch on the trading floor.", { chat_id: chatId, message_id: msg.message_id, parse_mode: 'Markdown' });
             delete userSessions[chatId];
         } catch (error) {
-            bot.editMessageText("❌ Failed to connect to Laravel Server. Make sure it is running.", { chat_id: chatId, message_id: msg.message_id });
+            console.error("API Error details:", error.message);
+            bot.editMessageText("❌ Failed to drop catch metadata onto web nodes. Check server tunnel status.", { chat_id: chatId, message_id: msg.message_id });
         }
     } else if (action === 'cancel') {
         bot.editMessageText("❌ Cancelled.", { chat_id: chatId, message_id: msg.message_id });
