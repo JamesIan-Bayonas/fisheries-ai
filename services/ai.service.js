@@ -1,11 +1,10 @@
-// file: jamesian-bayonas/fisheries-ai/services/ai.service.js
 const axios = require('axios');
 
 class AIService {
     constructor() {
         this.ollamaUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
         this.geminiApiKey = process.env.GEMINI_API_KEY;
-        this.timeoutMs = 5000; 
+        this.timeoutMs = 8000; // Raised to 8 seconds to allow large image uploads to complete safely
     }
 
     async identifyFish(imageBuffer) {
@@ -20,7 +19,7 @@ class AIService {
                 {
                     contents: [{
                         parts: [
-                            // FIXED: Structural repositioning. Image data MUST sit at array index 0
+                            // FIXED: The base64 inlineData object MUST be placed first at index 0 for validation to pass
                             {
                                 inlineData: {
                                     mimeType: "image/jpeg",
@@ -39,11 +38,11 @@ class AIService {
             return { species: fishName, engine: 'gemini' };
 
         } catch (error) {
-            console.warn(`⚠️ Cloud Node Unreachable/Timed Out (${error.message}). Rerouting to Local RTX 4060 Edge...`);
+            console.warn(`⚠️ Cloud Node Rejection/Timeout (${error.message}). Rerouting to Local RTX 4060 Edge...`);
 
             try {
                 const ollamaResponse = await axios.post(`${this.ollamaUrl}/api/generate`, {
-                    // FIXED: Changed tag from "llava" to match the modern "llama3.2-vision" model core
+                    // FIXED: Changed from "llava" to "llama3.2-vision" to match your modern local model store
                     model: "llama3.2-vision", 
                     prompt: promptText,
                     images: [base64Image],
@@ -62,4 +61,4 @@ class AIService {
     }
 }
 
-module.exports = new AIService();
+module.exports = new AIService();   

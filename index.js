@@ -28,7 +28,7 @@ bot.on('photo', async (msg) => {
     bot.sendMessage(chatId, "✅ Sea conditions safe. Scanning catch using Gemini AI...");
 
     try {
-        const photo = msg.photo[msg.photo.length - 1]; // Get highest resolution
+        const photo = msg.photo.length > 1 ? msg.photo[msg.photo.length - 2] : msg.photo[0]; // Get highest resolution
         
         // Download image buffer from Telegram
         const fileLink = await bot.getFileLink(photo.file_id);
@@ -103,7 +103,7 @@ bot.on('callback_query', async (callbackQuery) => {
     const action = callbackQuery.data;
     const msg = callbackQuery.message;
     const chatId = msg.chat.id;
-    const session = userSessions[chatId];
+    const session = userSessions[chatId];   
 
     if (!session) {
         return bot.answerCallbackQuery(callbackQuery.id, { text: "Session expired." });
