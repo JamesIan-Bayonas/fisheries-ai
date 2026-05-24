@@ -1,14 +1,26 @@
 const axios = require('axios');
+const http = require('http');
 
 class AIService {
     constructor() {
-        this.ollamaUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+        const rawUrl = process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434';
+        this.ollamaUrl = rawUrl.replace(/\/$/, '').replace('localhost', '127.0.0.1');
         this.geminiApiKey = process.env.GEMINI_API_KEY;
-        this.timeoutMs = 8000; // Raised to 8 seconds to allow large image uploads to complete safely
+        
+        this.cloudTimeoutMs = 5000; 
+        this.edgeTimeoutMs = 5000; 
+
+        // Hardened HTTP Agent to handle massive loopback data serialization
+        this.localAgent = new http.Agent({
+            keepAlive: false,       // Force sockets to close cleanly after execution
+            maxFreeSockets: 10,
+            timeout: 60000          // Prevent internal socket pooling freezes
+        });
     }
 
     async identifyFish(imageBuffer) {
-        const base64Image = imageBuffer.toString('base64');
+        // Clean the base64 data to ensure it is a valid, uncorrupted data sequence
+        const base64Image = imageBuffer.toString('base64').replace(/[\r\n]+/g, '').trim();
         const promptText = "Identify the fish species. Reply with ONLY the common name (e.g., Lapu-Lapu, Bangus, Yellowfin Tuna). No extra text.";
 
         try {
@@ -19,7 +31,6 @@ class AIService {
                 {
                     contents: [{
                         parts: [
-                            // FIXED: The base64 inlineData object MUST be placed first at index 0 for validation to pass
                             {
                                 inlineData: {
                                     mimeType: "image/jpeg",
@@ -30,7 +41,7 @@ class AIService {
                         ]
                     }]
                 },
-                { timeout: this.timeoutMs }
+                { timeout: this.cloudTimeoutMs }
             );
 
             const fishName = geminiResponse.data.candidates[0].content.parts[0].text.trim();
@@ -41,12 +52,27 @@ class AIService {
             console.warn(`⚠️ Cloud Node Rejection/Timeout (${error.message}). Rerouting to Local RTX 4060 Edge...`);
 
             try {
-                const ollamaResponse = await axios.post(`${this.ollamaUrl}/api/generate`, {
-                    // FIXED: Changed from "llava" to "llama3.2-vision" to match your modern local model store
-                    model: "llama3.2-vision", 
+                const targetEndpoint = `${this.ollamaUrl}/api/generate`;
+                console.log(`🧠 Hardware Injection: Transmitting image matrix to ${targetEndpoint}...`);
+                
+                const ollamaResponse = await axios.post(targetEndpoint, {
+                    // Target your clean, base local model tag directly
+                    model: "llama3.2-vision:latest", 
                     prompt: promptText,
                     images: [base64Image],
-                    stream: false 
+                    stream: false,
+                    
+                    // OUT-OF-THE-BOX INJECTION: Control the hardware allocation directly from your application layer
+                    options: {
+                        num_ctx: 512,        // Dynamically forces the VRAM context cache down to free up ~1.5GB of GPU memory
+                        temperature: 0.1     // Keeps the identification precise and deterministic
+                    },
+                    keep_alive: "30m"        // Directs the background daemon to keep the model warm in VRAM for 30 minutes
+                }, { 
+                    timeout: this.edgeTimeoutMs,
+                    httpAgent: this.localAgent,
+                    maxContentLength: Infinity,
+                    maxBodyLength: Infinity
                 });
 
                 const fishName = ollamaResponse.data.response.trim();
@@ -61,4 +87,4 @@ class AIService {
     }
 }
 
-module.exports = new AIService();   
+module.exports = new AIService();

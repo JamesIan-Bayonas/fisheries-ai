@@ -1,0 +1,7 @@
+FROM llama3.2-vision:latest
+
+# Force the context cache down to 512 tokens to save ~1.5 GB of VRAM
+PARAMETER num_ctx 512
+
+# Set the garbage collection retention timeline using uppercase syntax
+PARAMETER keep_alive "30m"
