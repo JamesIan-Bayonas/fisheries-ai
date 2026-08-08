@@ -16,6 +16,6 @@
     "axios": "^1.15.2",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "node-telegram-bot-api": "^0.63.0"
+    "node-telegram-bot-api": "^1.2.0"
   }
 }
