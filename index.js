@@ -1,7 +1,7 @@
+// index.js
 require('dotenv').config();
 const { checkSeaConditions } = require('./services/weather.service');
 const TelegramBotRaw = require('node-telegram-bot-api');
-// Dynamic CommonJS/ESM Interop Unwrapping (Node v24+ Compatibility)
 const TelegramBot = TelegramBotRaw.default || TelegramBotRaw;
 const aiService = require('./services/ai.service');
 const isdalogApi = require('./services/isdalog.api');
@@ -10,30 +10,35 @@ const token = process.env.TELEGRAM_BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
 
 // ============================================================================
-// 🧼 EMERGENCY DEFENSE AUTO-CLEAR
-// Forces Telegram to wipe its webhook memory on boot so long-polling won't crash
+// 🧼 TELEGRAM CLOUD WEBHOOK CLEANER (Fixed Method Name)
 // ============================================================================
-bot.deleteWebHook()
+bot.deleteWebhook()
     .then(() => {
         console.log("🧼 Telegram Cloud Webhook Cache successfully wiped clean!");
     })
     .catch((err) => {
-        console.error("⚠️ Failed to clear webhook cache:", err.message);
+        console.warn("⚠️ Webhook wipe skipped (polling will proceed):", err.message);
     });
-// ============================================================================
+
+// Handle intermittent network polling disconnects defensively
+bot.on('polling_error', (error) => {
+    if (error.code !== 'EFATAL') {
+        console.warn('⚠️ Telegram Polling Notice:', error.message);
+    }
+});
 
 // In-memory session state dictionary across conversational loops
 const userSessions = {};
 
 console.log("🎣 IsdaLog Telegram AI Bot [Defense-Ready Edition] is running...");
 
-// Command Handler: Manual entry workflow bypassing automated vision model
+// Command Handler: Manual entry workflow
 bot.onText(/\/manual/, (msg) => {
     const chatId = msg.chat.id;
     
     userSessions[chatId] = {
         telegram_chat_id: String(chatId),
-        lat: "8.6512", // Default geospatial coordinates for Galas Port
+        lat: "8.6512",
         lon: "123.4211",
         state: 'AWAITING_SPECIES'
     };
@@ -68,8 +73,8 @@ bot.on('photo', async (msg) => {
         const arrayBuffer = await response.arrayBuffer();
         const imageBuffer = Buffer.from(arrayBuffer);
 
-        // Dispatch image buffer to dual AI inference pipeline (Gemini Cloud -> Ollama Edge)
-        const aiResult = await aiService.identifyFish(imageBuffer, 'image/jpeg');
+        // Dispatch to AI inference pipeline
+        const aiResult = await aiService.identifyFish(imageBuffer);
         
         if (!aiResult || aiResult.species === "Unknown Fish" || aiResult.engine === "failed") {
             throw new Error("AI Engine Resolution Failed.");
@@ -77,7 +82,6 @@ bot.on('photo', async (msg) => {
 
         const fishNameString = aiResult.species;
 
-        // Populate session state
         userSessions[chatId] = {
             telegram_chat_id: String(chatId),
             species: fishNameString,
@@ -88,7 +92,7 @@ bot.on('photo', async (msg) => {
 
         bot.sendMessage(
             chatId, 
-            `🎯 Identified: **${fishNameString}**!\n\nPlease type the total weight in kilograms (e.g., 15):`, 
+            `🎯 Identified: **${fishNameString}** via ${aiResult.engine.toUpperCase()}!\n\nPlease type the total weight in kilograms (e.g., 15):`, 
             { parse_mode: 'Markdown' }
         );
 
@@ -112,7 +116,7 @@ bot.on('photo', async (msg) => {
 
         bot.sendMessage(
             chatId, 
-            "⚠️ The automated vision server is currently busy computing heavy image layers. Let's process your catch manually to ensure zero listing downtime!", 
+            "⚠️ The automated vision servers are currently offline or computing heavy layers. Let's process your catch manually to ensure zero listing downtime!", 
             fallbackOptions
         );
     }
@@ -123,13 +127,11 @@ bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
 
-    // Guard clause against non-text components or commands
     if (!text || msg.photo || text.startsWith('/')) return;
 
     const session = userSessions[chatId];
     if (!session) return;
 
-    // State A: Capturing manual species text input
     if (session.state === 'AWAITING_SPECIES') {
         session.species = text.trim();
         session.state = 'AWAITING_WEIGHT';
@@ -141,7 +143,6 @@ bot.on('message', async (msg) => {
         );
     }
 
-    // State B: Capturing numerical weight value
     if (session.state === 'AWAITING_WEIGHT') {
         const weight = parseFloat(text);
 
@@ -149,7 +150,6 @@ bot.on('message', async (msg) => {
             return bot.sendMessage(chatId, "⚠️ Please enter a valid numerical value for weight (e.g., 15).");
         }
 
-        // Local baseline pricing heuristic
         let pricePerKg = 150;
         if (session.species.toLowerCase().includes('lapu')) pricePerKg = 250;
         if (session.species.toLowerCase().includes('tuna') || session.species.toLowerCase().includes('ahi')) pricePerKg = 300;
@@ -175,16 +175,13 @@ bot.on('message', async (msg) => {
     }
 });
 
-// Step 4: Callback Query Listener (Inline Action Buttons)
+// Step 4: Callback Query Listener
 bot.on('callback_query', async (callbackQuery) => {
     const action = callbackQuery.data;
     const msg = callbackQuery.message;
     const chatId = msg.chat.id;
 
-    // Direct route for manual override button before checking active session
     if (action === 'trigger_manual') {
-        console.log(`🛠️ Manual fallback trigger engaged for Chat ID: ${chatId}. Initializing clean state...`);
-        
         userSessions[chatId] = {
             telegram_chat_id: String(chatId),
             lat: "8.6512",
@@ -219,13 +216,13 @@ bot.on('callback_query', async (callbackQuery) => {
         try {
             await isdalogApi.publishCatch(session);
             bot.editMessageText(
-                "✅ **Successfully Published!**\nYour item allocation is live on the marketplace trading floor.", 
+                "✅ **Successfully Published!**\nYour catch is live on the marketplace floor.", 
                 { chat_id: chatId, message_id: msg.message_id, parse_mode: 'Markdown' }
             );
             delete userSessions[chatId];
         } catch (error) {
-            console.error("API Tunnel Broadcast Failure:", error.message);
-            bot.editMessageText("❌ Failed to register catch details on web nodes. Check server tunnel status.", { chat_id: chatId, message_id: msg.message_id });
+            console.error("API Broadcast Failure:", error.message);
+            bot.editMessageText("❌ Failed to register catch. Verify backend server status.", { chat_id: chatId, message_id: msg.message_id });
         }
     } else if (action === 'cancel') {
         bot.editMessageText("❌ Session closed. Metadata flushed.", { chat_id: chatId, message_id: msg.message_id });

@@ -2,7 +2,7 @@
 const axios = require('axios');
 
 /**
- * Forwards Gemini AI catch extractions to Laravel, bypassing LocalTunnel security landing walls
+ * Forwards Gemini AI catch extractions and environmental context to Laravel API
  */
 async function publishCatch(session) {
     const apiUrl = process.env.ISDALOG_API_URL;
@@ -12,25 +12,35 @@ async function publishCatch(session) {
     }
 
     try {
-        // AUTOMATION REINFORCEMENT: Adding custom headers to skip the tunnel splash screen completely
-        const response = await axios.post(`${apiUrl}/catches`, {
+        const payload = {
             telegram_chat_id: String(session.telegram_chat_id),
             species: session.species,
             weight: parseFloat(session.weight),
-            lat: String(session.lat),
-            lon: String(session.lon)
-        }, {
+            lat: parseFloat(session.lat || 8.58),
+            lon: parseFloat(session.lon || 123.33)
+        };
+
+        if (session.wind_speed !== undefined) {
+            payload.wind_speed = parseFloat(session.wind_speed);
+        }
+        if (session.temperature !== undefined) {
+            payload.temperature = parseFloat(session.temperature);
+        }
+        if (session.weather_condition) {
+            payload.weather_condition = String(session.weather_condition);
+        }
+
+        const response = await axios.post(`${apiUrl}/catches`, payload, {
             headers: {
-                // This specific header forces LocalTunnel to skip the warning page and forward raw data directly
                 'bypass-tunnel-reminder': 'true',
-                'User-Agent': 'IsdalogEcosystemBot/1.0'
+                'User-Agent': 'IsdalogEcosystemBot/1.0',
+                'Accept': 'application/json'
             }
         });
 
         console.log("🚀 Automation Bridge Success:", response.data);
         return response.data;
     } catch (error) {
-        // Detailed log error tracing to see exactly what response status the server is pushing back
         console.error("❌ Automation Bridge Broken:", error.response?.data || error.message);
         throw error;
     }
