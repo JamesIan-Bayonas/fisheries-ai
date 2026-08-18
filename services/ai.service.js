@@ -23,13 +23,13 @@ class AIService {
         const base64Image = imageBuffer.toString('base64').replace(/[\r\n]+/g, '').trim();
         const promptText = "Identify the fish species. Reply with ONLY the common name (e.g., Lapu-Lapu, Bangus, Yellowfin Tuna, Tilapia). No extra text.";
 
-        // --- 1. CLOUD INFERENCE: Google Gemini 1.5 Flash ---
+        // --- 1. CLOUD INFERENCE: Google Gemini (REST API) ---
         if (this.geminiApiKey && this.geminiApiKey !== 'your_gemini_api_key') {
             try {
-                console.log("🌐 Routing to Cloud Node (Google Gemini 1.5 Flash)...");
+                console.log("🌐 Routing to Cloud Node (Google Gemini 2.5 Flash)...");
                 
                 const geminiResponse = await axios.post(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.geminiApiKey}`,
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.geminiApiKey}`,
                     {
                         contents: [{
                             parts: [
@@ -56,7 +56,9 @@ class AIService {
                     return { species: fishName, engine: 'gemini' };
                 }
             } catch (error) {
-                console.warn(`⚠️ Cloud Node Rejection/Timeout (${error.response?.status || error.message}). Rerouting to Local Edge...`);
+                const status = error.response?.status;
+                const errDetail = error.response?.data?.error?.message || error.message;
+                console.warn(`⚠️ Cloud Node Rejection/Timeout (Status: ${status}): ${errDetail}. Rerouting to Local Edge...`);
             }
         } else {
             console.warn("⚠️ GEMINI_API_KEY is missing or unconfigured in .env. Skipping cloud layer...");
