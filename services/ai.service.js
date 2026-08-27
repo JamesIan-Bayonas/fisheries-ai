@@ -1,4 +1,4 @@
-// services/ai.service.js
+// File: fishery-ai/services/ai.service.js
 const axios = require('axios');
 const http = require('http');
 
@@ -8,8 +8,9 @@ class AIService {
         this.ollamaUrl = rawUrl.replace(/\/$/, '').replace('localhost', '127.0.0.1');
         this.geminiApiKey = process.env.GEMINI_API_KEY;
         
-        this.cloudTimeoutMs = 7000; 
-        this.edgeTimeoutMs = 8000; 
+        // Extended timeouts for maritime cellular connectivity and high-resolution base64 payloads
+        this.cloudTimeoutMs = 15000; 
+        this.edgeTimeoutMs = 10000; 
 
         // Hardened HTTP Agent for local socket recycling
         this.localAgent = new http.Agent({
@@ -51,7 +52,7 @@ class AIService {
 
                 const candidate = geminiResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text;
                 if (candidate) {
-                    const fishName = candidate.trim();
+                    const fishName = candidate.trim().replace(/^["']|["']$/g, '');
                     console.log(`✅ Cloud Engine Success: ${fishName}`);
                     return { species: fishName, engine: 'gemini' };
                 }

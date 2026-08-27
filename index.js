@@ -1,5 +1,6 @@
-// index.js
+// File: fishery-ai/index.js
 require('dotenv').config();
+const https = require('https');
 const { checkSeaConditions } = require('./services/weather.service');
 const TelegramBotRaw = require('node-telegram-bot-api');
 const TelegramBot = TelegramBotRaw.default || TelegramBotRaw;
@@ -8,7 +9,27 @@ const isdalogApi = require('./services/isdalog.api');
 const axios = require('axios');
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
-const bot = new TelegramBot(token, { polling: true });
+
+// Hardened HTTPS Agent enforcing IPv4 DNS resolution and keep-alive recycling
+const agent = new https.Agent({
+    keepAlive: true,
+    keepAliveMsecs: 10000,
+    family: 4, // Force IPv4 to bypass ISP IPv6 routing drops
+    timeout: 30000
+});
+
+const bot = new TelegramBot(token, {
+    polling: {
+        interval: 1000,
+        autoStart: true,
+        params: {
+            timeout: 20
+        }
+    },
+    request: {
+        agent: agent
+    }
+});
 
 // ============================================================================
 // 🛡️ PROCESS-LEVEL NETWORK RESILIENCE & EXCEPTION GUARDS
@@ -182,8 +203,10 @@ bot.onText(/\/manual/, async (msg) => {
 // ============================================================================
 // 📸 VISION PIPELINE (Photo Capture & OCR)
 // ============================================================================
+// File: fishery-ai/index.js (bot.on('photo') block)
 bot.on('photo', async (msg) => {
     const chatId = msg.chat.id;
+    let imageBuffer = null;
 
     try {
         await bot.sendMessage(chatId, "<code>[TELEMETRY] Probing maritime sea conditions in Zamboanga del Norte...</code>", { parse_mode: 'HTML' });
@@ -197,10 +220,18 @@ bot.on('photo', async (msg) => {
         await bot.sendMessage(chatId, "<code>[VISION ENGINE] Analyzing biological catch matrix via Gemini Flash...</code>", { parse_mode: 'HTML' });
 
         const photo = msg.photo.length > 1 ? msg.photo[msg.photo.length - 2] : msg.photo[0];
-        const fileLink = await bot.getFileLink(photo.file_id);
-        const response = await fetch(fileLink);
-        const arrayBuffer = await response.arrayBuffer();
-        const imageBuffer = Buffer.from(arrayBuffer);
+
+        // 1. Get raw file path with retry
+        const fileInfo = await bot.getFile(photo.file_id);
+        const downloadUrl = `https://api.telegram.org/file/bot${token}/${fileInfo.file_path}`;
+
+        // 2. Download via Axios buffer with IPv4 agent
+        const response = await axios.get(downloadUrl, {
+            responseType: 'arraybuffer',
+            httpsAgent: agent,
+            timeout: 20000
+        });
+        imageBuffer = Buffer.from(response.data);
 
         const aiResult = await aiService.identifyFish(imageBuffer);
 
@@ -223,8 +254,12 @@ bot.on('photo', async (msg) => {
 
     } catch (error) {
         console.warn(`⚠️ Vision/Transport Alert: ${error.message}`);
+        
+        // Preserve the downloaded image buffer even if AI species identification failed
         userSessions[chatId] = {
             telegram_chat_id: String(chatId),
+            species: null,
+            image_base64: imageBuffer ? imageBuffer.toString('base64') : (userSessions[chatId]?.image_base64 || null),
             state: 'AWAITING_SPECIES'
         };
 
@@ -365,7 +400,13 @@ bot.on('callback_query', async (callbackQuery) => {
     const chatId = msg.chat.id;
 
     if (action === 'trigger_manual') {
-        userSessions[chatId] = { telegram_chat_id: String(chatId), state: 'AWAITING_SPECIES' };
+        const existingImage = userSessions[chatId]?.image_base64 || null;
+        userSessions[chatId] = { 
+            telegram_chat_id: String(chatId), 
+            species: null,
+            image_base64: existingImage,
+            state: 'AWAITING_SPECIES' 
+        };
         await bot.sendMessage(chatId, "🐟 <b>Please type the fish species name:</b>", { parse_mode: 'HTML' });
         return await bot.answerCallbackQuery(callbackQuery.id);
     }
