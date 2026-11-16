@@ -1,0 +1,37 @@
+# Dependency folders (Massive token drains)
+node_modules/
+bower_components/
+vendor/
+
+# Build and distribution outputs
+dist/
+build/
+.next/
+.nuxt/
+out/
+
+# Environment files and local secrets
+.env
+.env.*
+!.env.example
+
+# Large media and binary assets
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.mp4
+*.pdf
+*.zip
+*.tar.gz
+
+# Cache and logs
+.cache/
+.npm/
+*.log
+npm-debug.log*
+
+# Version control system data
+.git/
+.svn/
+.hg/

@@ -1,0 +1,30 @@
+# ==============================================================================
+# FISHERY-AI INGESTION GATEWAY & BRAIN GOVERNANCE (/fishery-ai/)
+# ==============================================================================
+# Scope: Node.js Edge AI Service, Telegram Telegraf/Bot Engine, Ollama / Gemini
+
+## 1. FILE HEADER PATH LOGGING LAW
+- Every modified or created file MUST start with the absolute path comment on line 1:
+  - JavaScript: `// File: fishery-ai/services/ai.service.js`
+  - Docker/Modelfile: `# File: fishery-ai/Modelfile`
+
+## 2. CRITICAL ALGORITHM & INFERENCE IMMUNITY
+- PROTECTED CORE: Do not refactor, truncate, or restructure the core processing units in:
+  - `services/ai.service.js` (Dual Cloud-to-Edge AI fallback pipeline)
+  - `services/isdalog.api.js` (Ecosystem HTTP bridge)
+  - `services/weather.service.js` (Open-Meteo port wind speed & safety threshold evaluator)
+  - `Modelfile` (VRAM optimization parameters)
+- Dual-Tier Inference Rules:
+  - Cloud tier (`gemini-2.5-flash`) MUST maintain timeout thresholds (`7000ms`).
+  - Edge fallback tier (`llama3.2-vision:latest`) MUST use explicit `http.Agent` socket pooling with `keepAlive: false` and `num_ctx 512` constraints to prevent GPU memory saturation.
+  - Failover state must always resolve to `{ species: "Unknown Fish", engine: "failed" }` instead of throwing unhandled process crashes.
+
+## 3. STATE MACHINE & SESSION INTEGRITY
+- Telegram conversation state sequence in `index.js` is invariant:
+  `AWAITING_SPECIES` -> `AWAITING_WEIGHT` -> `AWAITING_PRICE` -> `AWAITING_PORT_CHOICE` -> `AWAITING_CONFIRMATION`
+- Input Sanitization Law: All text inputs for weight and price MUST pass through `sanitizeNumericInput()` before updating session objects to prevent NaN propagation to the core API.
+- Process Resilience: Top-level listeners for `unhandledRejection`, `uncaughtException`, and `polling_error` must remain intact at all times.
+
+## 4. STRICT ZERO PLACEHOLDERS & COMPLETE CODE
+- Full source output only. Never emit incomplete callback trees, missing action cases in `bot.on('callback_query')`, or partial regex parsers.
+- CommonJS standard: Enforce `require()` / `module.exports` syntax in accordance with `package.json` (`"type": "commonjs"`).
