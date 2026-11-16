@@ -1,5 +1,21 @@
-// file: jamesian-bayonas/fisheries-ai/services/isdalog.api.js
+// File: fishery-ai/services/isdalog.api.js
 const axios = require('axios');
+const { randomUUID } = require('crypto');
+
+function apiBase() {
+    const url = process.env.ISDALOG_API_URL || process.env.LARAVEL_API_URL;
+    if (!url) throw new Error('Backend URL is not configured.');
+    const base = url.replace(/\/$/, '');
+    return base.endsWith('/api') ? base : base + '/api';
+}
+function botHeaders() {
+    if (!process.env.ISDALOG_BOT_SECRET) throw new Error('Bot authentication is not configured.');
+    return { 'X-Isdalog-Bot-Secret': process.env.ISDALOG_BOT_SECRET, Accept: 'application/json' };
+}
+async function linkAccount(payload) {
+    try { return await axios.post(apiBase() + '/telegram/link', payload, { headers: botHeaders(), timeout: 15000 }); }
+    catch (error) { console.error('Account linking failed.', { status: error.response?.status }); throw error; }
+}
 
 /**
  * Forwards Gemini AI catch extractions, images, and environmental context to Laravel API
@@ -16,7 +32,9 @@ async function publishCatch(session) {
     const endpoint = baseUrl.endsWith('/api') ? `${baseUrl}/catches` : `${baseUrl}/api/catches`;
 
     try {
+        session.submission_id ||= randomUUID();
         const payload = {
+            submission_id: session.submission_id,
             telegram_chat_id: String(session.telegram_chat_id),
             species: session.species,
             weight: parseFloat(session.weight),
@@ -39,21 +57,23 @@ async function publishCatch(session) {
 
         const response = await axios.post(endpoint, payload, {
             headers: {
+                ...botHeaders(),
                 'bypass-tunnel-reminder': 'true',
                 'User-Agent': 'IsdalogEcosystemBot/1.0',
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             },
-            maxContentLength: Infinity,
-            maxBodyLength: Infinity
+            timeout: 30000,
+            maxContentLength: 1024 * 1024,
+            maxBodyLength: 8 * 1024 * 1024
         });
 
-        console.log("🚀 Automation Bridge Success:", response.data);
+        console.log("Catch published.");
         return response.data;
     } catch (error) {
-        console.error("❌ Automation Bridge Broken:", error.response?.data || error.message);
+        console.error('Catch publication failed.', { status: error.response?.status });
         throw error;
     }
 }
 
-module.exports = { publishCatch };
+module.exports = { publishCatch, linkAccount };

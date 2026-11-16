@@ -147,6 +147,7 @@ function getPortSelectionKeyboard() {
 // 🔗 /start HANDLER (Deep Linking & Handshake)
 // ============================================================================
 bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
+    if (msg.chat.type !== 'private' || String(msg.chat.id) !== String(msg.from?.id)) return;
     const chatId = msg.chat.id;
     const startPayload = match && match[1] ? match[1].trim() : '';
 
@@ -155,7 +156,7 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
         const username = msg.from.username || msg.from.first_name || '';
 
         try {
-            const response = await axios.post(`${process.env.LARAVEL_API_URL}/api/telegram/link`, {
+            const response = await isdalogApi.linkAccount({
                 token: token,
                 telegram_chat_id: String(chatId),
                 telegram_username: username,
@@ -185,6 +186,7 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
 // ⌨️ /manual OVERRIDE HANDLER
 // ============================================================================
 bot.onText(/\/manual/, async (msg) => {
+    if (msg.chat.type !== 'private' || String(msg.chat.id) !== String(msg.from?.id)) return;
     const chatId = msg.chat.id;
     userSessions[chatId] = {
         telegram_chat_id: String(chatId),
@@ -205,6 +207,7 @@ bot.onText(/\/manual/, async (msg) => {
 // ============================================================================
 // File: fishery-ai/index.js (bot.on('photo') block)
 bot.on('photo', async (msg) => {
+    if (msg.chat.type !== 'private' || String(msg.chat.id) !== String(msg.from?.id)) return;
     const chatId = msg.chat.id;
     let imageBuffer = null;
 
@@ -284,6 +287,7 @@ bot.on('photo', async (msg) => {
 // 💬 STATE-DRIVEN TEXT LISTENER WITH INPUT GUARDRAILS
 // ============================================================================
 bot.on('message', async (msg) => {
+    if (msg.chat.type !== 'private' || String(msg.chat.id) !== String(msg.from?.id)) return;
     const chatId = msg.chat.id;
     const text = msg.text;
 
@@ -395,6 +399,7 @@ bot.on('message', async (msg) => {
 // 🔘 CALLBACK QUERY MATRIX (Actions, Field Edits, Port Select)
 // ============================================================================
 bot.on('callback_query', async (callbackQuery) => {
+    if (callbackQuery.message?.chat.type !== 'private' || String(callbackQuery.message.chat.id) !== String(callbackQuery.from.id)) return;
     const action = callbackQuery.data;
     const msg = callbackQuery.message;
     const chatId = msg.chat.id;
@@ -489,6 +494,7 @@ bot.on('callback_query', async (callbackQuery) => {
                 await bot.editMessageText("<b>❌ [REGISTRATION FAILED]</b>\nCould not persist listing to the core database. Verify Laravel API connectivity.", {
                     chat_id: chatId,
                     message_id: msg.message_id,
+                    reply_markup: getSummaryKeyboard(),
                     parse_mode: 'HTML'
                 });
             }
